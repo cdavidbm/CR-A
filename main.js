@@ -247,3 +247,55 @@ function generateNoiseTexture() {
     texture.repeat.set(4, 4);
     return texture;
 }
+
+// --- INICIO: Integración MIDI ---
+if (navigator.requestMIDIAccess) {
+    navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+}
+
+function onMIDISuccess(midiAccess) {
+    for (let input of midiAccess.inputs.values()) {
+        input.onmidimessage = handleMIDIMessage;
+    }
+}
+
+function onMIDIFailure() {
+    console.warn('No se pudo acceder a la entrada MIDI.');
+}
+
+function handleMIDIMessage(event) {
+    const [status, cc, value] = event.data;
+    // Solo mensajes CC (Control Change)
+    if ((status & 0xF0) === 0xB0) {
+        // Morph knobs: CC 110-115
+        if (cc >= 110 && cc <= 115) {
+            const idx = cc - 110;
+            const morphControls = document.querySelectorAll('#morph-controls input[type="range"]');
+            if (morphControls[idx]) {
+                // Mapear 0-127 a 0-1
+                const v = value / 127;
+                morphControls[idx].value = v;
+                morphControls[idx].dispatchEvent(new Event('input'));
+            }
+        }
+        // Color: CC 116 (0-127 -> 0-360)
+        if (cc === 116) {
+            const colorSlider = document.getElementById('color');
+            if (colorSlider) {
+                const v = Math.round((value / 127) * 360);
+                colorSlider.value = v;
+                colorSlider.dispatchEvent(new Event('input'));
+            }
+        }
+        // Tamaño: CC 117 (0-127 -> 50-150)
+        if (cc === 117) {
+            const sizeSlider = document.getElementById('size');
+            if (sizeSlider) {
+                const v = Math.round(50 + (value / 127) * 100);
+                sizeSlider.value = v;
+                sizeSlider.dispatchEvent(new Event('input'));
+            }
+        }
+    }
+}
+// --- FIN: Integración MIDI ---
