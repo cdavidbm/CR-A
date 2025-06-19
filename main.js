@@ -1,35 +1,39 @@
+// Importa las dependencias principales de Three.js y sus extensiones
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
-let mainMesh = null;
-let autoRotate = false;
-let animationMixer = null;
-let animationAction = null;
-let animationPlaying = false;
+// Variables globales para el manejo de la escena y animaciones
+let mainMesh = null; // Referencia a la malla principal del modelo
+let autoRotate = false; // Estado de auto rotación
+let animationMixer = null; // Mezclador de animaciones
+let animationAction = null; // Acción de animación activa
+let animationPlaying = false; // Estado de reproducción de animación
 
-// Configuración básica
+// Configuración básica de la escena y el renderer
 const escenaDiv = document.getElementById('escena');
 const width = escenaDiv.clientWidth;
 const height = escenaDiv.clientHeight;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); // Antialias para suavizar
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); // Antialias para suavizar bordes
 renderer.setClearColor(0x000000, 0); // Fondo transparente
 renderer.setSize(width, height);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.outputEncoding = THREE.sRGBEncoding;
-escenaDiv.appendChild(renderer.domElement);
+escenaDiv.appendChild(renderer.domElement); // Inserta el canvas en el DOM
 
-// Iluminación más tenue
+// Iluminación ambiental tenue
 scene.add(new THREE.AmbientLight(0xffffff, 0.15));
 
+// Luz hemisférica para simular luz ambiental desde el cielo y el suelo
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x222233, 0.3);
 hemiLight.position.set(0, 1, 0);
 scene.add(hemiLight);
 
+// Luz direccional para sombras y realce
 const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
 dirLight.position.set(3, 10, 10);
 dirLight.castShadow = true;
@@ -38,36 +42,37 @@ dirLight.shadow.mapSize.width = 2048;
 dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
 
+// Luz puntual tipo spot para dar profundidad
 const spotLight = new THREE.SpotLight(0xfff0e0, 0.25, 0, Math.PI / 6, 0.2, 1.5);
 spotLight.position.set(-8, 12, 8);
 spotLight.castShadow = true;
 scene.add(spotLight);
 
-
+// Fondo transparente (puedes cambiarlo por un gradiente procedural si lo deseas)
 // const gradTexture = new THREE.CanvasTexture(generateGradientTexture());
 // scene.background = gradTexture;
 scene.background = null;
 
-// Controles de órbita
+// Controles de órbita para mover la cámara con el mouse
 const controls = new OrbitControls(camera, renderer.domElement);
 camera.position.z = 4;
 controls.update();
 
-// Cargar el modelo GLB
+// Carga del modelo GLB usando GLTFLoader
 const loader = new GLTFLoader();
 loader.load(
     'modelo.glb',
     function (gltf) {
-        scene.add(gltf.scene);
+        scene.add(gltf.scene); // Agrega el modelo a la escena
 
-        // Mejorar materiales y agregar texturas procedurales
+        // Mejora materiales y agrega texturas procedurales a las mallas
         gltf.scene.traverse(obj => {
             if (obj.isMesh) {
-                if (!mainMesh) mainMesh = obj;
+                if (!mainMesh) mainMesh = obj; // Guarda la primera malla encontrada como principal
                 obj.castShadow = true;
                 obj.receiveShadow = true;
 
-                // Si el material es MeshStandardMaterial, mejora la apariencia
+                // Si el material es MeshStandardMaterial, ajusta sus propiedades para mejor apariencia
                 if (obj.material && obj.material.isMeshStandardMaterial) {
                     obj.material.roughness = 0.25;
                     obj.material.metalness = 0.7;
@@ -77,7 +82,7 @@ loader.load(
                     obj.material.sheen = 0.5;
                     obj.material.sheenColor = new THREE.Color(0x88aaff);
 
-                    // Añadir textura procedural tipo ruido para dar interés
+                    // Añade una textura procedural de ruido como bumpMap
                     obj.material.bumpMap = generateNoiseTexture();
                     obj.material.bumpScale = 0.08;
                     obj.material.needsUpdate = true;
@@ -85,13 +90,13 @@ loader.load(
             }
         });
 
-        // Animaciones
+        // Si el modelo tiene animaciones, prepara el mezclador y la acción
         if (gltf.animations && gltf.animations.length > 0) {
             animationMixer = new THREE.AnimationMixer(gltf.scene);
             animationAction = animationMixer.clipAction(gltf.animations[0]);
         }
 
-        // Buscar mallas con morph targets (shape keys)
+        // Busca mallas con morph targets (shape keys) y crea sliders para controlarlos
         gltf.scene.traverse(obj => {
             if (obj.isMesh && obj.morphTargetInfluences && obj.morphTargetDictionary) {
                 const morphDict = obj.morphTargetDictionary;
@@ -106,6 +111,7 @@ loader.load(
                     slider.step = 0.01;
                     slider.value = morphInfluences[morphDict[name]];
                     slider.style.setProperty('--val', slider.value * 100);
+                    // Actualiza el valor del morph target al mover el slider
                     slider.oninput = () => {
                         morphInfluences[morphDict[name]] = parseFloat(slider.value);
                         slider.style.setProperty('--val', slider.value * 100);
@@ -122,13 +128,14 @@ loader.load(
     },
 );
 
-// Conexión de controles de manipulaciones
+// Obtiene referencias a los controles de la interfaz
 const colorSlider = document.getElementById('color');
 const sizeSlider = document.getElementById('size');
 const wireframeBtn = document.querySelector('.btn:nth-child(3)');
 const autoRotateBtn = document.querySelector('.btn:nth-child(2)');
 const animarBtn = document.querySelector('.btn:nth-child(1)');
 
+// Evento para cambiar el color del material principal usando el slider
 if (colorSlider) {
     colorSlider.addEventListener('input', () => {
         if (mainMesh && mainMesh.material) {
@@ -147,6 +154,7 @@ if (colorSlider) {
     });
 }
 
+// Evento para cambiar el tamaño (escala) del modelo usando el slider
 if (sizeSlider) {
     sizeSlider.addEventListener('input', () => {
         if (mainMesh) {
@@ -156,6 +164,7 @@ if (sizeSlider) {
     });
 }
 
+// Evento para alternar el modo wireframe del material principal
 if (wireframeBtn) {
     wireframeBtn.addEventListener('click', () => {
         if (mainMesh && mainMesh.material) {
@@ -171,6 +180,7 @@ if (wireframeBtn) {
     });
 }
 
+// Evento para activar/desactivar la auto rotación de la cámara
 if (autoRotateBtn) {
     autoRotateBtn.addEventListener('click', () => {
         autoRotate = !autoRotate;
@@ -179,6 +189,7 @@ if (autoRotateBtn) {
     });
 }
 
+// Evento para reproducir/pausar la animación del modelo
 if (animarBtn) {
     animarBtn.addEventListener('click', () => {
         if (animationMixer && animationAction) {
@@ -192,18 +203,18 @@ if (animarBtn) {
     });
 }
 
-// Función de animación
+// Función principal de animación/render loop
 function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
+    requestAnimationFrame(animate); // Llama a sí misma en cada frame
+    controls.update(); // Actualiza los controles de órbita
     if (animationMixer && animationPlaying) {
-        animationMixer.update(0.016);
+        animationMixer.update(0.016); // Avanza la animación si está activa
     }
-    renderer.render(scene, camera);
+    renderer.render(scene, camera); // Renderiza la escena
 }
 animate();
 
-// En el evento resize, ajusta el tamaño del renderer y la cámara al tamaño del div
+// Ajusta el tamaño del renderer y la cámara cuando la ventana cambia de tamaño
 window.addEventListener('resize', () => {
     const width = escenaDiv.clientWidth;
     const height = escenaDiv.clientHeight;
@@ -212,7 +223,7 @@ window.addEventListener('resize', () => {
     renderer.setSize(width, height);
 });
 
-// Utilidad: textura procedural de gradiente para fondo
+// Utilidad: genera una textura de gradiente para usar como fondo (no se usa por defecto)
 function generateGradientTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
@@ -226,7 +237,7 @@ function generateGradientTexture() {
     return canvas;
 }
 
-// Utilidad: textura procedural de ruido para bumpMap
+// Utilidad: genera una textura procedural de ruido para usar como bumpMap
 function generateNoiseTexture() {
     const size = 128;
     const canvas = document.createElement('canvas');
@@ -249,30 +260,34 @@ function generateNoiseTexture() {
 }
 
 // --- INICIO: Integración MIDI ---
+// Permite controlar los sliders desde un controlador MIDI externo (por ejemplo, Axiom 61)
 if (navigator.requestMIDIAccess) {
     navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
 }
 
+// Si se obtiene acceso MIDI, asigna el manejador de mensajes MIDI a cada entrada
 function onMIDISuccess(midiAccess) {
     for (let input of midiAccess.inputs.values()) {
         input.onmidimessage = handleMIDIMessage;
     }
 }
 
+// Si falla el acceso MIDI, muestra una advertencia en consola
 function onMIDIFailure() {
     console.warn('No se pudo acceder a la entrada MIDI.');
 }
 
+// Manejador de mensajes MIDI: mapea los CC a los sliders correspondientes
 function handleMIDIMessage(event) {
     const [status, cc, value] = event.data;
-    // Solo mensajes CC (Control Change)
+    // Solo procesa mensajes de tipo Control Change (CC)
     if ((status & 0xF0) === 0xB0) {
-        // Morph knobs: CC 110-115
+        // Morph knobs: CC 110-115 (asigna a los sliders de morph target)
         if (cc >= 110 && cc <= 115) {
             const idx = cc - 110;
             const morphControls = document.querySelectorAll('#morph-controls input[type="range"]');
             if (morphControls[idx]) {
-                // Mapear 0-127 a 0-1
+                // Convierte el valor MIDI (0-127) al rango del slider (0-1)
                 const v = value / 127;
                 morphControls[idx].value = v;
                 morphControls[idx].dispatchEvent(new Event('input'));
