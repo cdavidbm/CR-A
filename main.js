@@ -260,7 +260,7 @@ function generateNoiseTexture() {
 }
 
 // --- INICIO: Integración MIDI ---
-// Permite controlar los sliders desde un controlador MIDI externo (por ejemplo, Axiom 61)
+// Permite controlar los sliders desde un controlador MIDI externo
 if (navigator.requestMIDIAccess) {
     navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
 }
