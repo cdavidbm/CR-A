@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            /* Tamaños principales */
+            --controles-size: 1000px;
+            --controles-radius: 50%;
+            --escena-size: 410px;
+            --knob-size: 80px;
+            --arc-radius: 380px;
+
+            /* Colores y transparencias */
+            --controles-bg: rgba(185, 185, 185, 0.075);
+            --controles-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.10) 100%);
+            --controles-border: rgba(255, 255, 255, 0.35);
+            --controles-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.25), 0 1.5px 8px 0 rgba(255, 255, 255, 0.18) inset;
+
+            --escena-bg: rgba(158, 150, 150, 0.096);
+            --escena-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.05) 100%);
+            --escena-border: rgba(255, 255, 255, 0.35);
+            --escena-shadow: 0 4px 24px 0 rgba(31, 38, 135, 0.18), 0 1.5px 8px 0 rgba(255, 255, 255, 0.12) inset;
+
+            --knob-bg-main: rgba(217, 255, 0, 0.288);
+            --knob-bg-secondary: rgba(11, 28, 179, 0.466);
+
+            --hydra-z: -1;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Inter', Arial, Helvetica, sans-serif;
+            font-size: 18px;
+            color: #1a2233;
+        }
+
+        /* Fondo Hydra */
+        #hydra-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: var(--hydra-z);
+            display: block;
+        }
+
+        /* Contenedor circular de controles con efecto cristal */
+        #controles {
+            width: var(--controles-size);
+            height: var(--controles-size);
+            background: var(--controles-bg);
+            border-radius: var(--controles-radius);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--controles-shadow);
+            border: 2.5px solid var(--controles-border);
+            backdrop-filter: blur(18px) saturate(1.25);
+            -webkit-backdrop-filter: blur(18px) saturate(1.25);
+            overflow: hidden;
+        }
+
+        #controles::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: var(--controles-radius);
+            background: var(--controles-glass);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Contenedor de los knobs en arco */
+        #morph-controls {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        /* Posicionamiento absoluto de cada knob en el arco superior */
+        #morph-controls label {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Inter', Arial, Helvetica, sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1a2233;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.568), 0 1px 0 rgba(255, 255, 255, 0.644);
+            letter-spacing: 0.02em;
+            user-select: none;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.10));
+        }
+
+        #morph-controls label span,
+        #morph-controls label .knob-label-text {
+            margin-top: 8px;
+            font-size: 1.05em;
+            font-weight: 600;
+            color: #1a2233;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 2px 10px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px #fff4;
+            text-align: center;
+            pointer-events: none;
+            line-height: 1.2;
+            backdrop-filter: blur(2px);
+        }
+
+        /* 6 knobs distribuidos en arco superior de -100° a +100° */
+        #morph-controls label:nth-child(1) {
+            transform: translate(-50%, -50%) rotate(-100deg) translateY(calc(-1 * var(--arc-radius))) rotate(100deg);
+        }
+
+        #morph-controls label:nth-child(2) {
+            transform: translate(-50%, -50%) rotate(-60deg) translateY(calc(-1 * var(--arc-radius))) rotate(60deg);
+        }
+
+        #morph-controls label:nth-child(3) {
+            transform: translate(-50%, -50%) rotate(-20deg) translateY(calc(-1 * var(--arc-radius))) rotate(20deg);
+        }
+
+        #morph-controls label:nth-child(4) {
+            transform: translate(-50%, -50%) rotate(20deg) translateY(calc(-1 * var(--arc-radius))) rotate(-20deg);
+        }
+
+        #morph-controls label:nth-child(5) {
+            transform: translate(-50%, -50%) rotate(60deg) translateY(calc(-1 * var(--arc-radius))) rotate(-60deg);
+        }
+
+        #morph-controls label:nth-child(6) {
+            transform: translate(-50%, -50%) rotate(100deg) translateY(calc(-1 * var(--arc-radius))) rotate(-100deg);
+        }
+
+        /* Estilo de los knobs circulares */
+        #morph-controls input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: var(--knob-size);
+            height: var(--knob-size);
+            border-radius: 50%;
+            background: conic-gradient(var(--knob-bg-main) 0%,
+                    var(--knob-bg-main) calc(var(--val, 0) * 1%),
+                    var(--knob-bg-secondary) calc(var(--val, 0) * 1%),
+                    var(--knob-bg-secondary) 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 12px 0 rgba(31, 38, 135, 0.12), 0 1.5px 8px 0 rgba(255, 255, 255, 0.10) inset;
+            border: 2px solid rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(4px);
+            transition: box-shadow 0.2s, border 0.2s;
+        }
+
+        #morph-controls input[type="range"]:hover {
+            box-shadow: 0 4px 24px 0 rgba(31, 38, 135, 0.22), 0 1.5px 8px 0 rgba(255, 255, 255, 0.18) inset;
+            border: 2.5px solid rgba(255, 255, 255, 0.38);
+        }
+
+        /* Ocultar la bolita del slider/knob */
+        #morph-controls input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 0;
+        }
+
+        /* Escena 3D centrada dentro del círculo con efecto cristal */
+        #escena {
+            width: var(--escena-size);
+            height: var(--escena-size);
+            background: var(--escena-bg);
+            border-radius: 50%;
+            box-shadow: var(--escena-shadow);
+            border: 2px solid var(--escena-border);
+            backdrop-filter: blur(12px) saturate(1.1);
+            -webkit-backdrop-filter: blur(12px) saturate(1.1);
+            position: relative;
+            z-index: 3;
+            overflow: hidden;
+            margin-bottom: 32px;
+        }
+
+        #escena::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: var(--escena-glass);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Contenedor de manipulaciones abajo de la escena */
+        #manipulaciones {
+            width: 40%;
+            max-width: 600px;
+            margin: 0 auto;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 72px;
+            z-index: 4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-radius: 18px;
+            box-shadow: 0 4px 24px 0 rgba(31, 38, 135, 0.10);
+            padding: 18px 24px 14px 24px;
+            backdrop-filter: blur(10px) saturate(1.1);
+            -webkit-backdrop-filter: blur(10px) saturate(1.1);
+            border: 1.5px solid rgba(255, 255, 255, 0.22);
+        }
+
+        /* Opcional: mejora botones y sliders dentro de #manipulaciones */
+        #manipulaciones .btn {
+            margin: 0 8px 8px 0;
+            padding: 10px 18px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(90deg, #00bcd4 0%, #8b5cf6 100%);
+            color: #fff;
+            font-weight: 600;
+            font-size: 1em;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        #manipulaciones .btn--primary {
+            background: linear-gradient(90deg, #f9d423 0%, #ff4e50 100%);
+        }
+
+        #manipulaciones .btn:hover {
+            background: linear-gradient(90deg, #8b5cf6 0%, #00bcd4 100%);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        #manipulaciones .button-group {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        #manipulaciones .control-group {
+            width: 100%;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        #manipulaciones label {
+            font-size: 0.95em;
+            font-weight: 500;
+            color: #1a2233;
+            margin-bottom: 4px;
+        }
+
+        #manipulaciones .slider {
+            width: 80%;
+            margin: 0 auto 8px auto;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="hydra-canvas"></canvas>
+    <div id="controles">
+        <div id="morph-controls"></div>
+        <div id="escena"></div>
+        <div id="manipulaciones">
+            <div class="button-group">
+                <button class="btn">Animar</button>
+                <button class="btn">Auto Rotar</button>
+                <button class="btn">Wireframe</button>
+            </div>
+            <div class="control-group">
+                <label for="color">Color</label>
+                <input type="range" id="color" class="slider" min="0" max="360" value="180">
+            </div>
+            <div class="control-group">
+                <label for="size">Tamaño</label>
+                <input type="range" id="size" class="slider" min="50" max="150" value="100">
+            </div>
+            <button class="btn btn--primary">Aprobar Criatura</button>
+        </div>
+    </div>
+    <script type="module" src="/main.js"></script>
+
+    <!-- FONDO HYDRA -->
+
+    <script src="https://unpkg.com/hydra-synth"></script>
+    <script>
+        const hydra = new Hydra({
+            canvas: document.getElementById("hydra-canvas"),
+            detectAudio: false,
+        });
+
+        osc(10, 0.1, 1.2)
+            .color(0.8, 0.3, 0.9)
+            .blend(
+                osc(20, 0.1, 0.9)
+                    .rotate(0.7)
+                    .color(0.9, 0.4, 0.3)
+            )
+            .modulate(
+                noise(3, 0.1)
+                    .rotate(0.7)
+            )
+            .out()
+    </script>
+    <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.157.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="js/3d-viewer.js"></script>
+</body>
+
+</html>
