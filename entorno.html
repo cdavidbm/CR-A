@@ -785,10 +785,27 @@
                         }
                     });
 
-                    // Aplicar escala si existe
-                    if (criatura.scale !== undefined) {
-                        modelo.scale.set(criatura.scale, criatura.scale, criatura.scale);
+                    // Aplicar escala si existe (asegura un mínimo razonable)
+                    let escala = (typeof criatura.scale === "number" && criatura.scale > 0.3) ? criatura.scale : 1;
+                    modelo.scale.set(escala, escala, escala);
+
+                    // Vida y velocidad dependen de la escala
+                    // Vida: lineal entre 40 (escala 0.5) y 200 (escala 2), 100 en escala 1
+                    let vida = 100;
+                    if (escala < 1) {
+                        vida = 40 + (100 - 40) * escala;
+                    } else if (escala > 1) {
+                        vida = 100 + (200 - 100) * (escala - 1) / 1;
                     }
+                    // Velocidad: inversamente proporcional a la escala
+                    // 0.09 en escala 0.5, 0.05 en escala 1, 0.025 en escala 2
+                    let velocidadBase = 0.05;
+                    if (escala < 1) {
+                        velocidadBase = 0.05 + (1 - escala) * 0.08;
+                    } else if (escala > 1) {
+                        velocidadBase = 0.05 - (escala - 1) * 0.025;
+                    }
+                    velocidadBase = Math.max(0.015, Math.min(velocidadBase, 0.12));
 
                     // Posicionar la criatura (volver a la posición original)
                     // CAMBIO: permitir que las criaturas aparezcan en un área más grande del plano circular
@@ -810,16 +827,17 @@
                         modelo,
                         position: { ...pos },
                         velocidad: new THREE.Vector3(
-                            (Math.random() - 0.5) * 0.05,
+                            (Math.random() - 0.5) * velocidadBase,
                             0,
-                            (Math.random() - 0.5) * 0.05
+                            (Math.random() - 0.5) * velocidadBase
                         ),
                         colisionando: false,
                         tiempoColision: 0,
                         contadorColisiones: 0,
-                        vida: VIDA_INICIAL, // Añadir vida inicial
-                        particulasRecolectadas: 0, // Añadir contador de partículas
-                        scale: criatura.scale || 1,  // Guardar la escala original
+                        vida: vida,
+                        particulasRecolectadas: 0,
+                        scale: escala,
+                        velocidadBase,
                     });
 
                     document.getElementById('numCriaturas').textContent = criaturas.length;
@@ -875,10 +893,27 @@
                     }
                 });
 
-                // Aplicar escala si existe
-                if (criatura.scale !== undefined) {
-                    modelo.scale.set(criatura.scale, criatura.scale, criatura.scale);
+                // Aplicar escala si existe (asegura un mínimo razonable)
+                let escala = (typeof criatura.scale === "number" && criatura.scale > 0.3) ? criatura.scale : 1;
+                modelo.scale.set(escala, escala, escala);
+
+                // Vida y velocidad dependen de la escala
+                // Vida: lineal entre 40 (escala 0.5) y 200 (escala 2), 100 en escala 1
+                let vida = 100;
+                if (escala < 1) {
+                    vida = 40 + (100 - 40) * escala;
+                } else if (escala > 1) {
+                    vida = 100 + (200 - 100) * (escala - 1) / 1;
                 }
+                // Velocidad: inversamente proporcional a la escala
+                // 0.09 en escala 0.5, 0.05 en escala 1, 0.025 en escala 2
+                let velocidadBase = 0.05;
+                if (escala < 1) {
+                    velocidadBase = 0.05 + (1 - escala) * 0.08;
+                } else if (escala > 1) {
+                    velocidadBase = 0.05 - (escala - 1) * 0.025;
+                }
+                velocidadBase = Math.max(0.015, Math.min(velocidadBase, 0.12));
 
                 // Posicionar la criatura
                 // CAMBIO: permitir que las criaturas nuevas aparezcan en un área más grande del plano circular
@@ -900,16 +935,17 @@
                     modelo,
                     position: { ...pos },
                     velocidad: new THREE.Vector3(
-                        (Math.random() - 0.5) * 0.05,
+                        (Math.random() - 0.5) * velocidadBase,
                         0,
-                        (Math.random() - 0.5) * 0.05
+                        (Math.random() - 0.5) * velocidadBase
                     ),
                     colisionando: false,
                     tiempoColision: 0,
                     contadorColisiones: 0,
-                    vida: VIDA_INICIAL, // Añadir vida inicial
-                    particulasRecolectadas: 0, // Añadir contador de partículas
-                    scale: criatura.scale || 1,  // Guardar la escala original
+                    vida: vida,
+                    particulasRecolectadas: 0,
+                    scale: escala,
+                    velocidadBase,
                 });
 
                 // Actualizar contador
@@ -1085,8 +1121,16 @@
             // Mover criaturas
             const tiempoActual = Date.now();
             criaturas.forEach((criatura, index) => {
-                // Reducir vida
-                criatura.vida -= VIDA_DEGRADACION;
+                // Degradación de vida: criaturas pequeñas mueren más rápido, grandes más lento
+                let degradacion = VIDA_DEGRADACION;
+                if (criatura.scale < 1) {
+                    degradacion = VIDA_DEGRADACION * (1 + (1 - criatura.scale) * 1.2);
+                } else if (criatura.scale > 1) {
+                    degradacion = VIDA_DEGRADACION * (1 - (criatura.scale - 1) * 0.5);
+                }
+                degradacion = Math.max(0.01, degradacion);
+
+                criatura.vida -= degradacion;
 
                 // Actualizar apariencia
                 actualizarAparienciaPorVida(criatura);
