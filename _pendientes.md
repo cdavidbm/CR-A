@@ -17,14 +17,14 @@
 ### Efectos sonoros
 
 -  `index.html`:  
-  -  Controles  
-  -  Modo autorrotación  
-  -  Modo animación  
-  -  Click de envío de criatura
+      -  Controles  
+      -  Modo autorrotación  
+      -  Modo animación  
+      -  Click de envío de criatura
 
 -  `entorno.html`:  
-  -  Aparición de criatura  
-  -  Colisiones  
+      -  Aparición de criatura  
+      -  Colisiones  
 
 ### Música ambiental
 
