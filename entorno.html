@@ -82,9 +82,29 @@
         const channel = new BroadcastChannel('criaturas');
 
         // =========================
+        // === LIMPIAR localStorage
+        // =========================
+
+
+        function initSession() {
+            const currentSession = Date.now().toString();
+            const lastSession = localStorage.getItem('sessionId');
+
+            if (lastSession !== currentSession) {
+                console.log('Nueva sesión detectada, limpiando localStorage...');
+                localStorage.clear();
+                localStorage.setItem('sessionId', currentSession);
+            }
+        }
+
+
+
+        // =========================
         // === INICIALIZACIÓN
         // =========================
         function init() {
+            initSession();
+
             // Fondo procedural de espacio con estrellas, planetas y galaxias
             function generateSpaceBackground() {
                 const w = 2048, h = 1024;
@@ -798,14 +818,14 @@
                         vida = 100 + (200 - 100) * (escala - 1) / 1;
                     }
                     // Velocidad: inversamente proporcional a la escala
-                    // 0.09 en escala 0.5, 0.05 en escala 1, 0.025 en escala 2
+                    // Ahora criaturas pequeñas son aún más rápidas (factor aumentado de 0.08 a 0.12)
                     let velocidadBase = 0.05;
                     if (escala < 1) {
-                        velocidadBase = 0.05 + (1 - escala) * 0.08;
+                        velocidadBase = 0.05 + (1 - escala) * 0.12;
                     } else if (escala > 1) {
                         velocidadBase = 0.05 - (escala - 1) * 0.025;
                     }
-                    velocidadBase = Math.max(0.015, Math.min(velocidadBase, 0.12));
+                    velocidadBase = Math.max(0.015, Math.min(velocidadBase, 0.16));
 
                     // Posicionar la criatura (volver a la posición original)
                     // CAMBIO: permitir que las criaturas aparezcan en un área más grande del plano circular
@@ -906,14 +926,14 @@
                     vida = 100 + (200 - 100) * (escala - 1) / 1;
                 }
                 // Velocidad: inversamente proporcional a la escala
-                // 0.09 en escala 0.5, 0.05 en escala 1, 0.025 en escala 2
+                // Ahora criaturas pequeñas son aún más rápidas (factor aumentado de 0.08 a 0.12)
                 let velocidadBase = 0.05;
                 if (escala < 1) {
-                    velocidadBase = 0.05 + (1 - escala) * 0.08;
+                    velocidadBase = 0.05 + (1 - escala) * 0.12;
                 } else if (escala > 1) {
                     velocidadBase = 0.05 - (escala - 1) * 0.025;
                 }
-                velocidadBase = Math.max(0.015, Math.min(velocidadBase, 0.12));
+                velocidadBase = Math.max(0.015, Math.min(velocidadBase, 0.16));
 
                 // Posicionar la criatura
                 // CAMBIO: permitir que las criaturas nuevas aparezcan en un área más grande del plano circular
