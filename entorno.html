@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entorno de Criaturas</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1a2a3d, #2c3e50);
+        }
+
+        .info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="info">
+        <h3>🌍 Entorno de Criaturas</h3>
+        <p>Criaturas activas: <span id="numCriaturas">0</span></p>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
+        let scene, camera, renderer, controls;
+        const criaturas = [];
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let hoveredCriatura = null;
+        let selectedCriatura = null;
+        let dragging = false;
+        let dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0));
+        let dragPoint = new THREE.Vector3();
+
+        // Modificar las constantes
+        const RADIO_COLISION = 2;
+        const DURACION_COLISION = 500;
+        const FUERZA_REBOTE = 0.1; // Reducido de 0.5 a 0.1
+        const MAX_COLISIONES = 3;
+
+        // Añadir después de las constantes existentes
+        const PARTICLES_COUNT = 50;
+        const PARTICLE_SIZE = 0.1;
+        const PARTICLE_SPAWN_INTERVAL = 5000; // 5 segundos
+        const VIDA_INICIAL = 100;
+        const VIDA_DEGRADACION = 0.05; // Puntos que se restan por frame
+        const VIDA_WIREFRAME = 50; // Nivel donde empieza el wireframe
+        const PARTICULAS_PARA_VIDA = 1; // Partículas necesarias para recuperar vida
+        const VIDA_RECUPERADA = 5; // Cantidad de vida que se recupera
+        const DEFAULT_COLOR = 0;
+        const DEFAULT_SCALE = 1;
+        let particles = [];
+        let lastParticleSpawn = 0;
+
+        // Añadir después de las variables globales
+        const channel = new BroadcastChannel('criaturas');
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a2a3d);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 10);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+
+            // Iluminación
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 5, 5);
+            scene.add(directionalLight);
+
+            // Suelo
+            const planeGeometry = new THREE.PlaneGeometry(50, 50);
+            const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
+            const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+            plane.rotation.x = -Math.PI / 2;
+            plane.receiveShadow = true;
+            scene.add(plane);
+
+            // Añadir después de crear el plano
+            createParticles();
+
+            cargarCriaturas();
+            animate();
+
+            // Añadir eventos de mouse
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        // Añadir después de init()
+        function createParticles() {
+            for (let i = 0; i < PARTICLES_COUNT; i++) {
+                const geometry = new THREE.SphereGeometry(PARTICLE_SIZE, 4, 4);
+                const material = new THREE.MeshBasicMaterial({
+                    color: 0xff0000,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const particle = new THREE.Mesh(geometry, material);
+                spawnParticle(particle);
+                scene.add(particle);
+                particles.push(particle);
+            }
+        }
+
+        function spawnParticle(particle) {
+            particle.position.x = (Math.random() - 0.5) * 40;
+            particle.position.z = (Math.random() - 0.5) * 40;
+            particle.position.y = 0.1;
+            particle.visible = true;
+        }
+
+        function checkParticleCollisions() {
+            particles.forEach(particle => {
+                if (!particle.visible) return;
+
+                criaturas.forEach(criatura => {
+                    const distance = particle.position.distanceTo(criatura.modelo.position);
+                    if (distance < RADIO_COLISION) {
+                        particle.visible = false;
+                        criatura.particulasRecolectadas++;
+
+                        // Verificar si se debe recuperar vida
+                        if (criatura.particulasRecolectadas >= PARTICULAS_PARA_VIDA) {
+                            if (criatura.vida < VIDA_INICIAL) {
+                                criatura.vida += VIDA_RECUPERADA;
+                                criatura.vida = Math.min(criatura.vida, VIDA_INICIAL); // No exceder vida máxima
+                            }
+                            criatura.particulasRecolectadas = 0; // Reiniciar contador
+                        }
+                    }
+                });
+            });
+        }
+
+        function updateParticles() {
+            const currentTime = Date.now();
+            if (currentTime - lastParticleSpawn > PARTICLE_SPAWN_INTERVAL) {
+                particles.forEach(particle => {
+                    if (!particle.visible) {
+                        spawnParticle(particle);
+                    }
+                });
+                lastParticleSpawn = currentTime;
+            }
+        }
+
+        // Añadir funciones de interacción
+        function onMouseDown(event) {
+            if (hoveredCriatura) {
+                selectedCriatura = hoveredCriatura;
+                dragging = true;
+                controls.enabled = false; // Deshabilitar controles de cámara durante el arrastre
+            }
+        }
+
+        function onMouseUp() {
+            if (selectedCriatura && dragging) {
+                // Reiniciar movimiento desde la nueva posición
+                selectedCriatura.velocidad = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.05,
+                    0,
+                    (Math.random() - 0.5) * 0.05
+                );
+            }
+            selectedCriatura = null;
+            dragging = false;
+            controls.enabled = true; // Reactivar controles de cámara
+        }
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            if (dragging && selectedCriatura) {
+                raycaster.setFromCamera(mouse, camera);
+                const intersectPoint = new THREE.Vector3();
+                raycaster.ray.intersectPlane(dragPlane, intersectPoint);
+
+                // Actualizar posición de la criatura
+                selectedCriatura.modelo.position.copy(intersectPoint);
+                selectedCriatura.position = {
+                    x: intersectPoint.x,
+                    y: intersectPoint.y,
+                    z: intersectPoint.z
+                };
+                // Detener movimiento mientras se arrastra
+                selectedCriatura.velocidad.set(0, 0, 0);
+            }
+        }
+
+        async function cargarCriaturas() {
+            const criaturasGuardadas = JSON.parse(localStorage.getItem('criaturas') || '[]');
+            const loader = new GLTFLoader();
+
+            for (const criatura of criaturasGuardadas) {
+                try {
+                    // CAMBIO: usa la misma ruta que en main.js
+                    const gltf = await loader.loadAsync('modelo.glb');
+                    const modelo = gltf.scene.clone();
+
+                    // Aplicar los morph targets guardados
+                    modelo.traverse((child) => {
+                        if (child.isMesh && child.morphTargetInfluences && child.morphTargetDictionary) {
+                            Object.entries(criatura.morphTargets).forEach(([name, value]) => {
+                                const index = child.morphTargetDictionary[name];
+                                if (typeof index !== 'undefined') {
+                                    child.morphTargetInfluences[index] = value;
+                                }
+                            });
+
+                            // CAMBIO: convertir color de 0-360 a 0-1
+                            if (criatura.color !== undefined) {
+                                const color = new THREE.Color().setHSL(criatura.color / 360, 0.7, 0.5);
+                                child.material.color = color;
+                            }
+                        }
+                    });
+
+                    // Aplicar escala si existe
+                    if (criatura.scale !== undefined) {
+                        modelo.scale.set(criatura.scale, criatura.scale, criatura.scale);
+                    }
+
+                    // Posicionar la criatura (volver a la posición original)
+                    modelo.position.set(
+                        criatura.position.x,
+                        criatura.position.y,
+                        criatura.position.z
+                    );
+
+                    scene.add(modelo);
+                    criaturas.push({
+                        id: criatura.id,
+                        modelo,
+                        position: { ...criatura.position },
+                        velocidad: new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.05,
+                            0,
+                            (Math.random() - 0.5) * 0.05
+                        ),
+                        colisionando: false,
+                        tiempoColision: 0,
+                        contadorColisiones: 0,
+                        vida: VIDA_INICIAL, // Añadir vida inicial
+                        particulasRecolectadas: 0, // Añadir contador de partículas
+                        scale: criatura.scale || 1,  // Guardar la escala original
+                    });
+
+                    document.getElementById('numCriaturas').textContent = criaturas.length;
+                } catch (error) {
+                    console.error('Error al cargar criatura:', error);
+                }
+            }
+        }
+
+        // Añadir el listener de mensajes
+        channel.onmessage = async (event) => {
+            if (event.data.type === 'nueva_criatura') {
+                await cargarNuevaCriatura(event.data.data);
+            }
+        };
+
+        // Función para cargar una nueva criatura
+        async function cargarNuevaCriatura(criatura) {
+            const loader = new GLTFLoader();
+            try {
+                // CAMBIO: usa la misma ruta que en main.js
+                const gltf = await loader.loadAsync('modelo.glb');
+                const modelo = gltf.scene.clone();
+
+                // Aplicar los morph targets
+                modelo.traverse((child) => {
+                    if (child.isMesh && child.morphTargetInfluences && child.morphTargetDictionary) {
+                        Object.entries(criatura.morphTargets).forEach(([name, value]) => {
+                            const index = child.morphTargetDictionary[name];
+                            if (typeof index !== 'undefined') {
+                                child.morphTargetInfluences[index] = value;
+                            }
+                        });
+
+                        // CAMBIO: convertir color de 0-360 a 0-1
+                        if (criatura.color !== undefined) {
+                            const color = new THREE.Color().setHSL(criatura.color / 360, 0.7, 0.5);
+                            child.material.color = color;
+                        }
+                    }
+                });
+
+                // Aplicar escala si existe
+                if (criatura.scale !== undefined) {
+                    modelo.scale.set(criatura.scale, criatura.scale, criatura.scale);
+                }
+
+                // Posicionar la criatura
+                modelo.position.set(
+                    criatura.position.x,
+                    criatura.position.y,
+                    criatura.position.z
+                );
+
+                scene.add(modelo);
+                criaturas.push({
+                    id: criatura.id,
+                    modelo,
+                    position: { ...criatura.position },
+                    velocidad: new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.05,
+                        0,
+                        (Math.random() - 0.5) * 0.05
+                    ),
+                    colisionando: false,
+                    tiempoColision: 0,
+                    contadorColisiones: 0,
+                    vida: VIDA_INICIAL, // Añadir vida inicial
+                    particulasRecolectadas: 0, // Añadir contador de partículas
+                    scale: criatura.scale || 1,  // Guardar la escala original
+                });
+
+                // Actualizar contador
+                document.getElementById('numCriaturas').textContent = criaturas.length;
+            } catch (error) {
+                console.error('Error al cargar nueva criatura:', error);
+            }
+        }
+
+        function checkIntersection() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            // Restaurar criatura previamente hovereada
+            if (hoveredCriatura) {
+                // Restaurar escala original
+                const escalaOriginal = hoveredCriatura.scale || 1;
+                hoveredCriatura.modelo.scale.set(escalaOriginal, escalaOriginal, escalaOriginal);
+
+                hoveredCriatura.modelo.traverse(child => {
+                    if (child.isMesh) {
+                        child.material.emissive.setHex(0x000000);
+                        child.material.emissiveIntensity = 0;
+                    }
+                });
+            }
+
+            hoveredCriatura = null;
+
+            // Verificar nueva intersección
+            if (intersects.length > 0) {
+                const intersectedObject = intersects[0].object;
+                // Buscar el modelo raíz ascendiendo en la jerarquía
+                let root = intersectedObject;
+                while (root.parent && root.parent.type !== "Scene") {
+                    root = root.parent;
+                }
+                const criatura = criaturas.find(c => c.modelo === root);
+
+                if (criatura) {
+                    hoveredCriatura = criatura;
+                    // Aplicar efecto hover manteniendo la escala original
+                    const escalaOriginal = criatura.scale || 1;
+                    criatura.modelo.scale.set(
+                        escalaOriginal * 1.1,
+                        escalaOriginal * 1.1,
+                        escalaOriginal * 1.1
+                    );
+
+                    criatura.modelo.traverse(child => {
+                        if (child.isMesh) {
+                            child.material.emissive.setHex(0x00ff00);
+                            child.material.emissiveIntensity = 0.5;
+                        }
+                    });
+                }
+            }
+        }
+
+        // Añadir función de detección de colisiones
+        function detectarColisiones() {
+            for (let i = 0; i < criaturas.length; i++) {
+                for (let j = i + 1; j < criaturas.length; j++) {
+                    const criatura1 = criaturas[i];
+                    const criatura2 = criaturas[j];
+
+                    const distancia = criatura1.modelo.position.distanceTo(criatura2.modelo.position);
+
+                    if (distancia < RADIO_COLISION) {
+                        // Incrementar contadores
+                        criatura1.contadorColisiones++;
+                        criatura2.contadorColisiones++;
+
+                        // Calcular dirección de rebote
+                        const direccion = new THREE.Vector3()
+                            .subVectors(criatura1.modelo.position, criatura2.modelo.position)
+                            .normalize();
+
+                        // Aplicar rebote con menor fuerza
+                        criatura1.velocidad.add(direccion.multiplyScalar(FUERZA_REBOTE));
+                        criatura2.velocidad.add(direccion.multiplyScalar(-FUERZA_REBOTE));
+
+                        // Marcar colisión
+                        criatura1.colisionando = true;
+                        criatura2.colisionando = true;
+                        criatura1.tiempoColision = Date.now();
+                        criatura2.tiempoColision = Date.now();
+
+                        // Aplicar efecto visual
+                        aplicarEfectoColision(criatura1);
+                        aplicarEfectoColision(criatura2);
+
+                        // Verificar si deben ser eliminadas
+                        verificarEliminacion(criatura1);
+                        verificarEliminacion(criatura2);
+                    }
+                }
+            }
+        }
+
+        // Añadir función para efecto visual de colisión
+        function aplicarEfectoColision(criatura) {
+            criatura.modelo.traverse(child => {
+                if (child.isMesh) {
+                    child.material.emissive.setHex(0xff0000);
+                    child.material.emissiveIntensity = 1;
+                }
+            });
+        }
+
+        // Añadir función para restaurar apariencia normal
+        function restaurarAparienciaNormal(criatura) {
+            criatura.modelo.traverse(child => {
+                if (child.isMesh) {
+                    child.material.emissive.setHex(0x000000);
+                    child.material.emissiveIntensity = 0;
+                }
+            });
+            criatura.colisionando = false;
+        }
+
+        // Modificar función verificarEliminacion
+        function verificarEliminacion(criatura) {
+            if (criatura.contadorColisiones >= MAX_COLISIONES) {
+                // Eliminar del escenario
+                scene.remove(criatura.modelo);
+
+                // Eliminar del array de criaturas
+                const index = criaturas.indexOf(criatura);
+                if (index > -1) {
+                    criaturas.splice(index, 1);
+                }
+
+                // Actualizar contador en la interfaz
+                document.getElementById('numCriaturas').textContent = criaturas.length;
+            }
+        }
+
+        // Modificar la función actualizarAparienciaPorVida
+        function actualizarAparienciaPorVida(criatura) {
+            criatura.modelo.traverse(child => {
+                if (child.isMesh) {
+                    // Solo modificamos la opacidad y el wireframe
+                    child.material.transparent = true;
+
+                    if (criatura.vida <= VIDA_WIREFRAME) {
+                        // Cuando la vida es baja, activamos wireframe y ajustamos opacidad
+                        child.material.wireframe = true;
+                        child.material.opacity = criatura.vida / VIDA_WIREFRAME;
+                    } else {
+                        // Mantener sólido y totalmente visible
+                        child.material.wireframe = false;
+                        child.material.opacity = 1;
+                    }
+                }
+            });
+        }
+
+        // Modificar la función animate para incluir la degradación de vida
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Actualizar raycast
+            checkIntersection();
+
+            // Detectar colisiones
+            detectarColisiones();
+            checkParticleCollisions();
+            updateParticles();
+
+            // Mover criaturas
+            const tiempoActual = Date.now();
+            criaturas.forEach((criatura, index) => {
+                // Reducir vida
+                criatura.vida -= VIDA_DEGRADACION;
+
+                // Actualizar apariencia
+                actualizarAparienciaPorVida(criatura);
+
+                // Eliminar si la vida llega a 0
+                if (criatura.vida <= 0) {
+                    scene.remove(criatura.modelo);
+                    criaturas.splice(index, 1);
+                    document.getElementById('numCriaturas').textContent = criaturas.length;
+                    return;
+                }
+
+                if (criatura === selectedCriatura && dragging) return;
+
+                if (criatura.colisionando && tiempoActual - criatura.tiempoColision > DURACION_COLISION) {
+                    restaurarAparienciaNormal(criatura);
+                }
+
+                // Restaurar movimiento en todos los ejes
+                criatura.modelo.position.add(criatura.velocidad);
+
+                // Rebote en los límites (restaurar comportamiento original)
+                if (Math.abs(criatura.modelo.position.x) > 20) {
+                    criatura.velocidad.x *= -1;
+                    criatura.modelo.position.x = Math.sign(criatura.modelo.position.x) * 20;
+                }
+                if (Math.abs(criatura.modelo.position.z) > 20) {
+                    criatura.velocidad.z *= -1;
+                    criatura.modelo.position.z = Math.sign(criatura.modelo.position.z) * 20;
+                }
+
+                criatura.modelo.rotation.y += 0.01;
+
+                if (hoveredCriatura === criatura) {
+                    criatura.modelo.position.y = criatura.position?.y || 0;
+                    criatura.modelo.position.y += Math.sin(Date.now() * 0.01) * 0.1;
+                }
+            });
+
+            renderer.render(scene, camera);
+            controls.update();
+        }
+
+        init();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>

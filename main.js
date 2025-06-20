@@ -5,10 +5,16 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 // Variables globales para el manejo de la escena y animaciones
 let mainMesh = null; // Referencia a la malla principal del modelo
-let autoRotate = false; // Estado de auto rotación
+let mainModel = null; // Referencia al grupo raíz del modelo
+// let autoRotate = false; // Eliminado: no se usa realmente
 let animationMixer = null; // Mezclador de animaciones
 let animationAction = null; // Acción de animación activa
 let animationPlaying = false; // Estado de reproducción de animación
+
+// Variables globales adicionales
+let wireframeMode = false;
+let morphTargets = {};
+const channel = new BroadcastChannel('criaturas');
 
 // Configuración básica de la escena y el renderer
 const escenaDiv = document.getElementById('escena');
@@ -55,7 +61,7 @@ scene.background = null;
 
 // Controles de órbita para mover la cámara con el mouse
 const controls = new OrbitControls(camera, renderer.domElement);
-camera.position.z = 4;
+camera.position.z = 5;
 controls.update();
 
 // Carga del modelo GLB usando GLTFLoader
@@ -64,6 +70,7 @@ loader.load(
     'modelo.glb',
     function (gltf) {
         scene.add(gltf.scene); // Agrega el modelo a la escena
+        mainModel = gltf.scene; // Guarda referencia al grupo raíz
 
         // Mejora materiales y agrega texturas procedurales a las mallas
         gltf.scene.traverse(obj => {
@@ -132,7 +139,7 @@ loader.load(
 const colorSlider = document.getElementById('color');
 const sizeSlider = document.getElementById('size');
 const wireframeBtn = document.querySelector('.btn:nth-child(3)');
-const autoRotateBtn = document.querySelector('.btn:nth-child(2)');
+// const autoRotateBtn = document.querySelector('.btn:nth-child(2)'); // Eliminado: no se usa
 const animarBtn = document.querySelector('.btn:nth-child(1)');
 
 // Evento para cambiar el color del material principal usando el slider
@@ -177,15 +184,6 @@ if (wireframeBtn) {
                     mainMesh.material.wireframe = !mainMesh.material.wireframe;
             }
         }
-    });
-}
-
-// Evento para activar/desactivar la auto rotación de la cámara
-if (autoRotateBtn) {
-    autoRotateBtn.addEventListener('click', () => {
-        autoRotate = !autoRotate;
-        controls.autoRotate = autoRotate;
-        controls.autoRotateSpeed = 2.0;
     });
 }
 
@@ -314,3 +312,105 @@ function handleMIDIMessage(event) {
     }
 }
 // --- FIN: Integración MIDI ---
+
+// Agregar las nuevas funciones de control
+window.resetAll = function () {
+    if (mainMesh && mainMesh.morphTargetDictionary) {
+        Object.keys(mainMesh.morphTargetDictionary).forEach(name => {
+            const index = mainMesh.morphTargetDictionary[name];
+            mainMesh.morphTargetInfluences[index] = 0;
+        });
+    }
+
+    // Reset sliders
+    document.querySelectorAll('input[type="range"]').forEach(slider => {
+        slider.value = slider.id === 'size' ? '100' : '0';
+        slider.dispatchEvent(new Event('input'));
+    });
+
+    // Reset auto-rotación
+    autoRotate = false;
+    controls.autoRotate = false;
+
+    // Reset wireframe
+    if (mainMesh) {
+        if (Array.isArray(mainMesh.material)) {
+            mainMesh.material.forEach(mat => {
+                if ('wireframe' in mat) mat.wireframe = false;
+            });
+        } else if (mainMesh.material && 'wireframe' in mainMesh.material) {
+            mainMesh.material.wireframe = false;
+        }
+    }
+};
+
+window.toggleWireframe = function () {
+    wireframeMode = !wireframeMode;
+    if (mainMesh) {
+        if (Array.isArray(mainMesh.material)) {
+            mainMesh.material.forEach(mat => {
+                if ('wireframe' in mat) mat.wireframe = wireframeMode;
+            });
+        } else if (mainMesh.material && 'wireframe' in mainMesh.material) {
+            mainMesh.material.wireframe = wireframeMode;
+        }
+    }
+};
+
+window.aprobarCriatura = function () {
+    if (!mainMesh) return;
+
+    // Capturar el estado actual de los morph targets
+    const criaturaEstado = {};
+    if (mainMesh.morphTargetDictionary && mainMesh.morphTargetInfluences) {
+        Object.entries(mainMesh.morphTargetDictionary).forEach(([name, index]) => {
+            criaturaEstado[name] = mainMesh.morphTargetInfluences[index];
+        });
+    }
+
+    const nuevaCriatura = {
+        id: Date.now(),
+        morphTargets: criaturaEstado,
+        position: {
+            x: (Math.random() - 0.5) * 20,
+            y: 0,
+            z: (Math.random() - 0.5) * 20
+        },
+        color: parseInt(document.getElementById('color').value),
+        scale: parseInt(document.getElementById('size').value) / 100,
+        timestamp: new Date().toISOString()
+    };
+
+    // Guardar en localStorage
+    const criaturas = JSON.parse(localStorage.getItem('criaturas') || '[]');
+    criaturas.push(nuevaCriatura);
+    localStorage.setItem('criaturas', JSON.stringify(criaturas));
+
+    // Enviar mensaje a través de BroadcastChannel
+    channel.postMessage({
+        type: 'nueva_criatura',
+        data: nuevaCriatura
+    });
+
+    // Resetear la criatura actual
+    resetAll();
+};
+
+// Nueva función para animar la figura girando sobre su eje Y
+window.girarFiguraY = function (velocidad = 0.02, duracion = 2000) {
+    if (!mainModel) return;
+    let tiempoInicio = performance.now();
+    let rotar = true;
+
+    function rotarY(now) {
+        if (!rotar || !mainModel) return;
+        let elapsed = now - tiempoInicio;
+        if (elapsed < duracion) {
+            mainModel.rotation.y += velocidad;
+            requestAnimationFrame(rotarY);
+        }
+    }
+    requestAnimationFrame(rotarY);
+
+    window.detenerGiroFiguraY = () => { rotar = false; };
+};

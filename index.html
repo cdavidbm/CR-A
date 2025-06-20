@@ -8,7 +8,7 @@
             /* Tamaños principales */
             --controles-size: 1000px;
             --controles-radius: 50%;
-            --escena-size: 410px;
+            --escena-size: 500px;
             --knob-size: 80px;
             --arc-radius: 380px;
 
@@ -17,11 +17,6 @@
             --controles-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.10) 100%);
             --controles-border: rgba(255, 255, 255, 0.35);
             --controles-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.25), 0 1.5px 8px 0 rgba(255, 255, 255, 0.18) inset;
-
-            --escena-bg: rgba(158, 150, 150, 0.096);
-            --escena-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.05) 100%);
-            --escena-border: rgba(255, 255, 255, 0.35);
-            --escena-shadow: 0 4px 24px 0 rgba(31, 38, 135, 0.18), 0 1.5px 8px 0 rgba(255, 255, 255, 0.12) inset;
 
             --knob-bg-main: rgba(217, 255, 0, 0.288);
             --knob-bg-secondary: rgba(11, 28, 179, 0.466);
@@ -185,12 +180,6 @@
         #escena {
             width: var(--escena-size);
             height: var(--escena-size);
-            background: var(--escena-bg);
-            border-radius: 50%;
-            box-shadow: var(--escena-shadow);
-            border: 2px solid var(--escena-border);
-            backdrop-filter: blur(12px) saturate(1.1);
-            -webkit-backdrop-filter: blur(12px) saturate(1.1);
             position: relative;
             z-index: 3;
             overflow: hidden;
@@ -202,7 +191,6 @@
             position: absolute;
             inset: 0;
             border-radius: 50%;
-            background: var(--escena-glass);
             pointer-events: none;
             z-index: 1;
         }
@@ -286,9 +274,10 @@
         <div id="escena"></div>
         <div id="manipulaciones">
             <div class="button-group">
-                <button class="btn">Animar</button>
-                <button class="btn">Auto Rotar</button>
-                <button class="btn">Wireframe</button>
+                <button class="btn"
+                    onclick="animationAction && animationAction.paused ? animationAction.paused = false : animationAction?.play()">Animar</button>
+                <button class="btn" onclick="girarFiguraY()">Auto Rotar</button>
+                <button class="btn" onclick="toggleWireframe()">Wireframe</button>
             </div>
             <div class="control-group">
                 <label for="color">Color</label>
@@ -298,7 +287,7 @@
                 <label for="size">Tamaño</label>
                 <input type="range" id="size" class="slider" min="50" max="150" value="100">
             </div>
-            <button class="btn btn--primary">Aprobar Criatura</button>
+            <button class="btn btn--primary" onclick="aprobarCriatura()" id="aprobarButton">Aprobar Criatura</button>
         </div>
     </div>
     <script type="module" src="/main.js"></script>
