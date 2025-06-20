@@ -33,10 +33,17 @@
     </div>
 
     <script type="module">
+        // =========================
+        // === CONFIGURACIÓN GLOBAL
+        // =========================
+
+        // Importaciones
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
         import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+        // === Variables y constantes principales ===
+        // (Modifica aquí los parámetros globales del entorno)
         let scene, camera, renderer, controls;
         const criaturas = [];
         const raycaster = new THREE.Raycaster();
@@ -47,29 +54,36 @@
         let dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0));
         let dragPoint = new THREE.Vector3();
 
-        // Modificar las constantes
+        // Parámetros de criaturas y colisiones
         const RADIO_COLISION = 2;
         const DURACION_COLISION = 500;
-        const FUERZA_REBOTE = 0.1; // Reducido de 0.5 a 0.1
+        const FUERZA_REBOTE = 0.1;
         const MAX_COLISIONES = 3;
 
-        // Añadir después de las constantes existentes
-        const PARTICLES_COUNT = 60;
+        // Parámetros de partículas rojas
+        const PARTICLES_COUNT = 60; // Número base de partículas (se multiplica en createParticles)
         const PARTICLE_SIZE = 0.2;
-        const PARTICLE_SPAWN_INTERVAL = 5000; // 5 segundos
-        const VIDA_INICIAL = 100;
-        const VIDA_DEGRADACION = 0.05; // Puntos que se restan por frame
-        const VIDA_WIREFRAME = 50; // Nivel donde empieza el wireframe
-        const PARTICULAS_PARA_VIDA = 1; // Partículas necesarias para recuperar vida
-        const VIDA_RECUPERADA = 5; // Cantidad de vida que se recupera
-        const DEFAULT_COLOR = 0;
-        const DEFAULT_SCALE = 1;
+        const PARTICLE_SPAWN_INTERVAL = 5000; // ms
         let particles = [];
         let lastParticleSpawn = 0;
 
-        // Añadir después de las variables globales
+        // Parámetros de vida de criaturas
+        const VIDA_INICIAL = 100;
+        const VIDA_DEGRADACION = 0.05;
+        const VIDA_WIREFRAME = 50;
+        const PARTICULAS_PARA_VIDA = 1;
+        const VIDA_RECUPERADA = 5;
+
+        // Otros parámetros
+        const DEFAULT_COLOR = 0;
+        const DEFAULT_SCALE = 1;
+
+        // Comunicación entre ventanas
         const channel = new BroadcastChannel('criaturas');
 
+        // =========================
+        // === INICIALIZACIÓN
+        // =========================
         function init() {
             // Fondo procedural de espacio con estrellas, planetas y galaxias
             function generateSpaceBackground() {
@@ -587,16 +601,20 @@
             document.addEventListener('mouseup', onMouseUp);
         }
 
+        // =========================
+        // === FUNCIONES DE ESCENA
+        // =========================
+
         // Añadir después de init()
         function createParticles() {
-            // Más abundancia de partículas rojas
-            const PARTICLES_COUNT_LOCAL = Math.floor(PARTICLES_COUNT * 1.5); // 50 * 1.5 = 75
+            // Más abundancia de partículas rojas y más brillo
+            const PARTICLES_COUNT_LOCAL = Math.floor(PARTICLES_COUNT * 1.5);
             for (let i = 0; i < PARTICLES_COUNT_LOCAL; i++) {
-                const geometry = new THREE.SphereGeometry(PARTICLE_SIZE * 1.8, 9, 9); // Más grandes y suaves
+                const geometry = new THREE.SphereGeometry(PARTICLE_SIZE * 1.8, 9, 9);
                 const material = new THREE.MeshStandardMaterial({
                     color: 0xff2222,
                     emissive: 0xff2222,
-                    emissiveIntensity: 2.2, // Más brillo
+                    emissiveIntensity: 2.2,
                     roughness: 0.18,
                     metalness: 0.7,
                     transparent: true,
@@ -651,6 +669,9 @@
             }
         }
 
+        // =========================
+        // === INTERACCIÓN DE USUARIO
+        // =========================
         // Añadir funciones de interacción
         function onMouseDown(event) {
             if (hoveredCriatura) {
@@ -695,6 +716,9 @@
             }
         }
 
+        // =========================
+        // === UTILIDADES Y TEXTURAS
+        // =========================
         // Añadir función para generar textura procedural de ruido (igual que en main.js)
         function generateNoiseTexture() {
             const size = 128;
@@ -717,6 +741,9 @@
             return texture;
         }
 
+        // =========================
+        // === CARGA Y GESTIÓN DE CRIATURAS
+        // =========================
         async function cargarCriaturas() {
             const criaturasGuardadas = JSON.parse(localStorage.getItem('criaturas') || '[]');
             const loader = new GLTFLoader();
@@ -892,6 +919,9 @@
             }
         }
 
+        // =========================
+        // === DETECCIÓN Y EFECTOS DE COLISIÓN
+        // =========================
         function checkIntersection() {
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(scene.children, true);
@@ -942,7 +972,6 @@
             }
         }
 
-        // Añadir función de detección de colisiones
         function detectarColisiones() {
             for (let i = 0; i < criaturas.length; i++) {
                 for (let j = i + 1; j < criaturas.length; j++) {
@@ -1152,16 +1181,21 @@
             controls.update();
         }
 
+        // =========================
+        // === INICIO DE LA ESCENA
+        // =========================
         init();
-
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
-        // === PRADO VERDE ===
+
+        // =========================
+        // === PRADO VERDE
+        // =========================
         function createGreenMeadow() {
-            // Zona de prado: círculo verde con borde y altura irregulares
+            // Zona de prado: círculo verde con borde y altura irregulares y textura procedural
             const meadowRadius = 7 + Math.random() * 4;
             const meadowTheta = Math.random() * Math.PI * 2;
             const meadowDist = 15 + Math.random() * 10;
